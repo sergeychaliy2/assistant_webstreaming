@@ -150,10 +150,14 @@ class HeyGenService extends ChangeNotifier implements AsyncDisposable {
       'mode': 'FULL',
       'is_sandbox': config.sandbox,
       'avatar_id': _effectiveAvatarId,
-      'avatar_persona': {
-        'voice_id': config.voiceId,
-        'context_id': config.contextId,
-        'language': config.language,
+      // Reference the stored Voice Agent (its context/knowledge base + voice +
+      // LLM config) instead of the deprecated inline `avatar_persona`. The
+      // legacy path only applied persona/voice and did NOT load the agent's
+      // knowledge base, so live sessions answered "I don't have that
+      // information" while the dashboard playground (which uses voice_agent)
+      // worked. The two fields are mutually exclusive.
+      'voice_agent': {
+        'id': AppConfig.voiceAgentId,
       },
       'interactivity_type': 'CONVERSATIONAL',
     });
@@ -559,6 +563,27 @@ class HeyGenService extends ChangeNotifier implements AsyncDisposable {
   }
 
   // ─── teardown ──────────────────────────────────────────────────────────────
+
+  /// Best-effort: tell HeyGen to release the session via REST WITHOUT the
+  /// local LiveKit teardown. Used on app exit, where the process is about to
+  /// die anyway — we only need to free the session server-side and must not
+  /// block on the (slow on Windows) WebRTC teardown.
+  Future<void> stopRemote() async {
+    final sid = _sessionId;
+    if (sid == null) return;
+    try {
+      await http.post(
+        Uri.parse('${AppConfig.heyGenApiBase}/v1/sessions/stop'),
+        headers: {
+          'X-API-KEY': config.apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'session_id': sid}),
+      );
+    } catch (e) {
+      _log.w('stopRemote failed', error: e);
+    }
+  }
 
   /// Full stop: tear down LiveKit and notify HeyGen via REST. Idempotent.
   Future<void> stop() async {

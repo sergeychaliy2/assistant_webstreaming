@@ -29,8 +29,16 @@ class PulsingLogo extends StatefulWidget {
 
 class _PulsingLogoState extends State<PulsingLogo>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: widget.period)..repeat();
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialized in initState (not a lazy `late final`) so disposing the
+    // widget before its first build can never trigger ticker creation
+    // during teardown.
+    _c = AnimationController(vsync: this, duration: widget.period)..repeat();
+  }
 
   @override
   void dispose() {

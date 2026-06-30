@@ -28,10 +28,20 @@ class AnimatedPlayButton extends StatefulWidget {
 
 class _AnimatedPlayButtonState extends State<AnimatedPlayButton>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _spin = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 7),
-  )..repeat();
+  late final AnimationController _spin;
+
+  @override
+  void initState() {
+    super.initState();
+    // Created here (not as a lazy field initializer) so the ticker is set
+    // up while the element is mounted. A lazy `late final` controller whose
+    // first access is dispose() would create the ticker mid-teardown and
+    // crash on the deactivated-ancestor lookup.
+    _spin = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 7),
+    )..repeat();
+  }
 
   @override
   void dispose() {

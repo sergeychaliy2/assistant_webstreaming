@@ -1,4 +1,4 @@
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, exit;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'controllers/session_controller.dart';
 import 'l10n/app_localization.dart';
 import 'l10n/app_strings.dart';
 import 'screens/session_screen.dart';
@@ -95,14 +96,25 @@ class _AssistantWebstreamingAppState extends State<AssistantWebstreamingApp>
     if (!_isDesktop) return;
     final ctx = _navigatorKey.currentContext;
     if (ctx == null) {
-      await windowManager.destroy();
+      await _hardExit();
       return;
     }
     final shouldExit = await _showExitDialog(ctx);
-    if (shouldExit == true) {
-      await windowManager.setPreventClose(false);
-      await windowManager.destroy();
-    }
+    if (shouldExit == true) await _hardExit();
+  }
+
+  /// Terminate immediately. A normal `windowManager.destroy()` is slow here:
+  /// the Flutter engine shutdown tears down the native WebRTC/LiveKit stack on
+  /// the platform thread, which can take seconds. We skip it — best-effort
+  /// release the HeyGen session (bounded so it can never hang the exit), then
+  /// exit the process outright. The OS reclaims everything else instantly.
+  Future<void> _hardExit() async {
+    try {
+      await SessionController.active
+          ?.shutdownForExit()
+          .timeout(const Duration(milliseconds: 1500));
+    } catch (_) {}
+    exit(0);
   }
 
   Future<bool?> _showExitDialog(BuildContext context) {

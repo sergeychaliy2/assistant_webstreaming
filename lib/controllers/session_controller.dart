@@ -42,6 +42,12 @@ class SessionController extends ChangeNotifier implements AsyncDisposable {
   static const _log = Log('Session');
   static const _tickInterval = Duration(milliseconds: 250);
 
+  /// The session the app shell should release on a hard exit. Set while a
+  /// session is being established / is live; cleared when it ends. Lets the
+  /// window-close handler stop the HeyGen session without coupling the window
+  /// lifecycle to the widget tree. See [shutdownForExit].
+  static SessionController? active;
+
   HeyGenService? _heyGen;
   Timer? _ticker;
 
@@ -95,6 +101,7 @@ class SessionController extends ChangeNotifier implements AsyncDisposable {
     svc.subtitle.addListener(_onSubtitleChanged);
     svc.avatarTalking.addListener(_onAvatarTalkingChanged);
     _heyGen = svc;
+    active = this;
 
     final ok = await svc.connect();
     if (!ok) {
@@ -124,11 +131,21 @@ class SessionController extends ChangeNotifier implements AsyncDisposable {
     } catch (e) {
       _log.w('end stop failed', error: e);
     }
+    if (identical(active, this)) active = null;
 
     _phase = SessionPhase.ended;
     _interaction = InteractionState.idle;
     _idleReason = IdleReason.sessionEnded;
     notifyListeners();
+  }
+
+  /// Best-effort, fire-the-REST-and-return teardown for app exit. Releases the
+  /// HeyGen session server-side without the slow local LiveKit teardown; the
+  /// caller bounds it with a timeout and then terminates the process.
+  Future<void> shutdownForExit() async {
+    try {
+      await _heyGen?.stopRemote();
+    } catch (_) {}
   }
 
   void _startTicker() {
@@ -246,6 +263,7 @@ class SessionController extends ChangeNotifier implements AsyncDisposable {
 
   @override
   Future<void> close() async {
+    if (identical(active, this)) active = null;
     _ticker?.cancel();
     _ticker = null;
     final svc = _heyGen;

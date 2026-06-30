@@ -65,25 +65,8 @@ class ConnectingView extends StatelessWidget {
   }
 }
 
-class _ConnectingSpinner extends StatefulWidget {
+class _ConnectingSpinner extends StatelessWidget {
   const _ConnectingSpinner({super.key});
-
-  @override
-  State<_ConnectingSpinner> createState() => _ConnectingSpinnerState();
-}
-
-class _ConnectingSpinnerState extends State<_ConnectingSpinner>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 2),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
